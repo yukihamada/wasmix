@@ -1,0 +1,24 @@
+name: "Feature request"
+description: "Propose a feature or improvement"
+title: "feat: "
+labels: ["type:feature", "triage"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why do we need this?
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: Specification / Acceptance criteria
+      description: Define the done conditions.
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Implementation plan
+      description: Rough steps and potential risks.

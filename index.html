@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WASMIX - Modern Web DAW</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="stylesheet" href="/src/styles/modern-dtm.css">
+  </head>
+  <body>
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="logo-section">
+        <img src="/icon.svg" alt="WASMIX" />
+        <span class="logo-text">WASMIX</span>
+      </div>
+      
+      <div class="status-bar">
+        <div class="status-indicators">
+          <div class="indicator" id="indicator-webcodecs">
+            <span>WebCodecs</span>
+            <strong id="hud-webcodecs">...</strong>
+          </div>
+          <div class="indicator" id="indicator-coi">
+            <span>COOP/COEP</span>
+            <strong id="hud-coi">...</strong>
+          </div>
+          <div class="indicator" id="indicator-sab">
+            <span>SAB</span>
+            <strong id="hud-sab">...</strong>
+          </div>
+          <div class="indicator" id="indicator-sw">
+            <span>Service Worker</span>
+            <strong id="hud-sw">...</strong>
+          </div>
+        </div>
+        
+        <div class="status-indicators">
+          <div class="indicator" id="indicator-offline" style="display:none;">
+            <span>🔴</span>
+            <strong>Offline</strong>
+          </div>
+          <div class="indicator" id="device-info">
+            <span id="device">No Device</span>
+            <span id="samplerate">--</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <!-- Transport Controls -->
+      <section class="transport-section">
+        <div class="transport-controls">
+          <button class="btn btn-primary btn-large" id="btn-start">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+            </svg>
+            Start Audio
+          </button>
+          <button class="btn btn-record" id="btn-record" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="8"/>
+            </svg>
+            Record
+          </button>
+          <button class="btn" id="btn-stop" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12"/>
+            </svg>
+            Stop
+          </button>
+        </div>
+        
+        <div class="transport-info">
+          <span class="indicator">
+            <span>Latency:</span>
+            <strong id="baselatency">--ms</strong>
+          </span>
+        </div>
+      </section>
+
+      <!-- Main Workspace -->
+      <div class="workspace">
+        <!-- Audio Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Audio Engine</h2>
+          </div>
+          <div class="panel-content">
+            <div class="audio-visualizer">
+              <div class="waveform-container" id="visualizer">
+                <!-- Waveform visualization will be rendered here -->
+              </div>
+            </div>
+            
+            <div class="row" style="gap: var(--space-sm); margin-bottom: var(--space-md);">
+              <button class="btn" id="btn-export" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+                Export WAV
+              </button>
+              <button class="btn" id="btn-save" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                </svg>
+                Save to Storage
+              </button>
+            </div>
+            
+            <div class="log mono" id="log" style="background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: var(--space-md); min-height: 48px; font-size: 12px; color: var(--text-secondary);"></div>
+          </div>
+        </div>
+        
+        <!-- File Browser Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">File Browser</h2>
+            <button class="btn" id="btn-list" style="padding: 4px 12px; font-size: 12px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
+          <div class="panel-content">
+            <div class="file-list" id="files">
+              <div style="text-align: center; color: var(--text-dim); padding: var(--space-lg);">
+                No files yet. Record something first!
+              </div>
+            </div>
+            <button class="btn" id="btn-load" disabled style="width: 100%; margin-top: var(--space-md);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Load & Play Latest
+            </button>
+          </div>
+        </div>
+        
+        <!-- MIDI Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">MIDI Devices</h2>
+            <button class="btn" id="btn-midi" style="padding: 4px 12px; font-size: 12px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H5V10h3v10zm4 0H9V4h3v16zm4 0h-3v-6h3v6z"/>
+              </svg>
+              Request Access
+            </button>
+          </div>
+          <div class="panel-content">
+            <div id="midi" style="min-height: 100px;">
+              <div style="text-align: center; color: var(--text-dim);">
+                Click "Request Access" to scan for MIDI devices
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Notes Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Project Notes</h2>
+            <span style="font-size: 11px; color: var(--text-dim);">
+              DocID: <span id="docid" style="font-family: var(--font-mono);"></span>
+            </span>
+          </div>
+          <div class="panel-content">
+            <textarea class="text-editor" id="notes" placeholder="Add your project notes here..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

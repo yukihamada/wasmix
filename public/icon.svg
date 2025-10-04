@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="32" fill="#111827"/>
+  <g fill="#93c5fd">
+    <path d="M40 160h16V96H40v64zm36 0h16V72H76v88zm36 0h16v-48h-16v48zm36 0h16v-24h-16v24zm36 0h16v-96h-16v96z"/>
+    <circle cx="120" cy="188" r="10" fill="#f9fafb"/>
+  </g>
+  <text x="120" y="48" fill="#e5e7eb" font-family="monospace" font-size="24" text-anchor="middle">WASMIX</text>
+</svg>
