@@ -285,6 +285,12 @@ class BestReceiver: NSObject, ObservableObject {
     @Published var orpheusNetworkQuality: String = "INITIALIZING"  // Orpheus品質
     @Published var clockDriftCorrection: Double = 0.0       // クロックドリフト補正値
     
+    // 📊 **接続品質監視**
+    @Published var lastConnectionTest: Date?                  // 最後の接続テスト時刻
+    @Published var lastPacketReceived: Date?                 // 最後のパケット受信時刻
+    @Published var corruptedPackets: UInt64 = 0              // 破損パケット数
+    @Published var connectionErrors: UInt64 = 0              // 接続エラー数
+    
     // 📹 Recording functionality
     @Published var isRecording: Bool = false
     @Published var recordingDuration: TimeInterval = 0
@@ -679,12 +685,23 @@ class BestReceiver: NSObject, ObservableObject {
     private func receiveLoop(_ conn: NWConnection) {
         conn.receiveMessage { (data, _, _, error) in
             if let data = data {
+                // 🧪 **接続テストパケット処理**
+                if let testString = String(data: data, encoding: .utf8), testString == "HIAUDIO_CONNECTION_TEST" {
+                    print("🧪 Connection test packet received - connection verified!")
+                    DispatchQueue.main.async {
+                        // 接続テスト成功を記録
+                        self.lastConnectionTest = Date()
+                    }
+                    self.receiveLoop(conn) // 次のパケットを待機
+                    return
+                }
+                
                 print("📱 Received \(data.count) bytes, orpheusEnabled: \(self.orpheusEnabled)")
                 if self.orpheusEnabled {
                     // 🔥 Process with Orpheus Protocol for ultra-precision
                     self.processOrpheusPacket(data)
                 } else {
-                    // Legacy packet processing
+                    // 🎵 **Enhanced Legacy packet processing**
                     if let packet = AudioPacket.deserialize(data) {
                         if packet.id > self.lastProcessedID {
                             self.lastProcessedID = packet.id
@@ -702,21 +719,44 @@ class BestReceiver: NSObject, ObservableObject {
                             
                             DispatchQueue.main.async {
                                 self.packetsReceived += 1
+                                
+                                // 📊 受信状況表示更新
+                                if packet.id % 750 == 0 {
+                                    self.lastPacketReceived = Date()
+                                    print("✅ Audio packets flowing: \(self.packetsReceived) total")
+                                }
                             }
                         } else {
                             print("🔄 Duplicate packet \(packet.id) filtered (last: \(self.lastProcessedID))")
                         }
                     } else {
-                        print("❌ Failed to deserialize packet (\(data.count) bytes)")
+                        print("❌ Failed to deserialize packet (\(data.count) bytes) - possible data corruption")
+                        // パケット破損の可能性を記録
+                        DispatchQueue.main.async {
+                            self.corruptedPackets += 1
+                        }
                     }
                 }
             } else {
-                print("📱 Received nil data")
+                print("📱 Received nil data from connection")
             }
-            if error == nil { 
-                self.receiveLoop(conn) 
+            
+            // エラーハンドリングの強化
+            if let error = error {
+                print("🔥 Receive error: \(error.localizedDescription)")
+                print("Connection state: \(conn.state)")
+                
+                // 接続エラーの場合、再接続を促す
+                DispatchQueue.main.async {
+                    self.connectionErrors += 1
+                }
+                
+                // エラーが致命的でない場合は受信を続行
+                if conn.state == .ready {
+                    self.receiveLoop(conn)
+                }
             } else {
-                print("Receive error: \(String(describing: error))")
+                self.receiveLoop(conn) 
             }
         }
     }

@@ -793,16 +793,37 @@ class BestSender: NSObject, ObservableObject {
         let packet = AudioPacket(id: packetID, payload: data, timestamp: timestamp)
         let serialized = packet.serialize()
         
-        // 全接続デバイスへ送信
-        for (_, conn) in connections {
-            // 1発目: 即送信
-            conn.send(content: serialized, completion: .contentProcessed { _ in })
-            
-            // ★【勝利の鍵】2発目: 1ms後に同じデータを送る
-            // これで帯域と引き換えに「絶対的な安定性」を買う
-            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(1)) {
-                conn.send(content: serialized, completion: .contentProcessed { _ in })
+        // 🚀 **最適化された送信ロジック** - 接続状態チェック付き
+        for (hostKey, conn) in connections {
+            // 接続が準備できているかチェック
+            guard conn.state == .ready else {
+                if packetID % 750 == 0 { // 1秒ごとにログ
+                    print("⚠️ Skipping \(hostKey) - connection not ready: \(conn.state)")
+                }
+                continue
             }
+            
+            // 🎯 **シンプルで確実な送信** - 重複送信を廃止し、エラーハンドリング強化
+            conn.send(content: serialized, completion: .contentProcessed { error in
+                if let error = error {
+                    if self.packetID % 750 == 0 { // エラーログも1秒ごと
+                        print("📡 Send error to \(hostKey): \(error)")
+                    }
+                    // 送信エラーの場合、接続をリセット
+                    DispatchQueue.main.async {
+                        if let device = self.discoveredDevices.first(where: { $0.host == hostKey }) {
+                            self.retryConnection(device: device)
+                        }
+                    }
+                }
+            })
+        }
+        
+        // 📊 アクティブ接続数の監視
+        if packetID % 750 == 0 {
+            let readyConnections = connections.filter { $0.value.state == .ready }.count
+            let totalConnections = connections.count
+            print("📡 Active connections: \(readyConnections)/\(totalConnections)")
         }
     }
     
@@ -836,23 +857,132 @@ class BestSender: NSObject, ObservableObject {
         let params = NWParameters.udp
         params.serviceClass = .interactiveVoice
         
-        // Connect to discovered devices
+        // 🔧 **UDP最適化**: バッファサイズとタイムアウト設定
+        params.defaultProtocolStack.transportProtocol = NWProtocolUDP.Options()
+        
+        // Connect to discovered devices with enhanced error handling
         for device in discoveredDevices {
+            // 既存接続をスキップ
+            if connections[device.host] != nil {
+                print("📍 Skipping \(device.name) - connection already exists")
+                continue
+            }
+            
             let host = NWEndpoint.Host(device.host)
             let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
             let conn = NWConnection(host: host, port: port, using: params)
+            
+            // 🚀 **強化された接続ハンドリング**
+            conn.stateUpdateHandler = { [weak self] state in
+                DispatchQueue.main.async {
+                    print("🔄 Connection to \(device.name) (\(device.host)): \(state)")
+                    switch state {
+                    case .ready:
+                        self?.addNotification(.success, "✅ Connected to \(device.name)")
+                        print("🎉 \(device.name) ready for audio streaming")
+                        
+                        // 接続テスト: 小さなパケットを送信
+                        self?.sendConnectionTest(to: conn, deviceName: device.name)
+                        
+                    case .failed(let error):
+                        self?.addNotification(.error, "❌ \(device.name): \(error.localizedDescription)")
+                        self?.connections.removeValue(forKey: device.host)
+                        print("💥 Connection failed to \(device.name): \(error)")
+                        
+                        // 3秒後に再接続を試行
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) {
+                            self?.retryConnection(device: device)
+                        }
+                        
+                    case .cancelled:
+                        self?.addNotification(.warning, "🚫 Connection to \(device.name) cancelled")
+                        self?.connections.removeValue(forKey: device.host)
+                        
+                    case .waiting(let error):
+                        print("⏳ Connection to \(device.name) waiting: \(error)")
+                        
+                    case .preparing:
+                        print("⚙️ Preparing connection to \(device.name)")
+                        
+                    case .setup:
+                        print("🔧 Setting up connection to \(device.name)")
+                        
+                    @unknown default:
+                        print("❓ Unknown connection state to \(device.name): \(state)")
+                    }
+                    self?.updateDeviceConnectionStatus()
+                }
+            }
+            
+            // 接続タイムアウト設定
+            DispatchQueue.global().asyncAfter(deadline: .now() + 10.0) {
+                switch conn.state {
+                case .ready, .cancelled:
+                    break // 既に成功または終了済み
+                case .failed(_):
+                    break // 既に失敗済み
+                default:
+                    print("⏰ Connection timeout to \(device.name) - cancelling")
+                    conn.cancel()
+                }
+            }
+            
             conn.start(queue: DispatchQueue.global(qos: .userInteractive))
             connections[device.host] = conn
+            print("🚀 Starting connection to \(device.name) at \(device.host):\(device.port)")
         }
         
-        // Connect to manual IPs as fallback
+        // Connect to manual IPs as fallback with enhanced error handling
         for ip in targetIPs {
             if connections[ip] == nil {
                 let host = NWEndpoint.Host(ip)
                 let port = NWEndpoint.Port(integerLiteral: HiAudioService.udpPort)
                 let conn = NWConnection(host: host, port: port, using: params)
+                
+                // 手動IP接続の強化されたハンドラー
+                conn.stateUpdateHandler = { [weak self] state in
+                    DispatchQueue.main.async {
+                        print("🔄 Manual IP \(ip): \(state)")
+                        switch state {
+                        case .ready:
+                            self?.addNotification(.success, "✅ Manual IP \(ip) connected")
+                            print("🎉 Manual IP \(ip) ready for streaming")
+                            
+                        case .failed(let error):
+                            self?.addNotification(.error, "❌ Manual IP \(ip): \(error.localizedDescription)")
+                            self?.connections.removeValue(forKey: ip)
+                            print("💥 Manual IP connection failed: \(error)")
+                            
+                        case .cancelled:
+                            self?.addNotification(.warning, "🚫 Manual IP \(ip) cancelled")
+                            self?.connections.removeValue(forKey: ip)
+                            
+                        case .waiting(let error):
+                            print("⏳ Manual IP \(ip) waiting: \(error)")
+                            
+                        default:
+                            break
+                        }
+                        self?.updateDeviceConnectionStatus()
+                    }
+                }
+                
+                // 手動IP接続もタイムアウト設定
+                DispatchQueue.global().asyncAfter(deadline: .now() + 10.0) {
+                    switch conn.state {
+                    case .ready, .cancelled:
+                        break // 既に成功または終了済み
+                    case .failed(_):
+                        break // 既に失敗済み
+                    default:
+                        print("⏰ Manual IP \(ip) timeout - cancelling")
+                        conn.cancel()
+                    }
+                }
+                
                 conn.start(queue: DispatchQueue.global(qos: .userInteractive))
                 connections[ip] = conn
+                print("🚀 Connecting to manual IP \(ip):\(HiAudioService.udpPort)")
             }
         }
         
@@ -862,9 +992,85 @@ class BestSender: NSObject, ObservableObject {
     private func updateDeviceConnectionStatus() {
         DispatchQueue.main.async {
             for i in 0..<self.discoveredDevices.count {
-                self.discoveredDevices[i].isConnected = self.connections[self.discoveredDevices[i].host] != nil
+                let device = self.discoveredDevices[i]
+                if let connection = self.connections[device.host] {
+                    // 接続が存在し、ready状態の場合のみ接続済みとする
+                    self.discoveredDevices[i].isConnected = (connection.state == .ready)
+                    print("🔍 Device \(device.name) connection state: \(connection.state)")
+                } else {
+                    self.discoveredDevices[i].isConnected = false
+                    print("🔍 Device \(device.name) has no connection")
+                }
             }
         }
+    }
+    
+    // 🔄 **接続再試行ロジック**
+    private func retryConnection(device: DiscoveredDevice) {
+        guard isStreaming else { return } // ストリーミング停止時は再試行しない
+        
+        print("🔄 Retrying connection to \(device.name)")
+        
+        let params = NWParameters.udp
+        params.serviceClass = .interactiveVoice
+        params.defaultProtocolStack.transportProtocol = NWProtocolUDP.Options()
+        
+        let host = NWEndpoint.Host(device.host)
+        let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
+        let conn = NWConnection(host: host, port: port, using: params)
+        
+        // 再試行用の状態ハンドラー
+        conn.stateUpdateHandler = { [weak self] state in
+            DispatchQueue.main.async {
+                print("🔄 Retry connection to \(device.name): \(state)")
+                switch state {
+                case .ready:
+                    self?.addNotification(.success, "🔄 Reconnected to \(device.name)")
+                    self?.sendConnectionTest(to: conn, deviceName: device.name)
+                case .failed(_):
+                    print("💥 Retry failed for \(device.name)")
+                    self?.connections.removeValue(forKey: device.host)
+                case .cancelled:
+                    self?.connections.removeValue(forKey: device.host)
+                default:
+                    break
+                }
+                self?.updateDeviceConnectionStatus()
+            }
+        }
+        
+        // 再試行にもタイムアウトを設定
+        DispatchQueue.global().asyncAfter(deadline: .now() + 8.0) {
+            switch conn.state {
+            case .ready, .cancelled:
+                break // 既に成功または終了済み
+            case .failed(_):
+                break // 既に失敗済み
+            default:
+                print("⏰ Retry timeout for \(device.name)")
+                conn.cancel()
+            }
+        }
+        
+        conn.start(queue: DispatchQueue.global(qos: .userInteractive))
+        connections[device.host] = conn
+    }
+    
+    // 🧪 **接続テスト** - 小さなパケットで接続確認
+    private func sendConnectionTest(to connection: NWConnection, deviceName: String) {
+        let testData = "HIAUDIO_CONNECTION_TEST".data(using: .utf8) ?? Data()
+        
+        connection.send(content: testData, completion: .contentProcessed { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ Connection test failed to \(deviceName): \(error)")
+                    self.addNotification(.warning, "⚠️ Connection test failed: \(deviceName)")
+                } else {
+                    print("✅ Connection test passed for \(deviceName)")
+                    self.addNotification(.info, "🧪 Connection verified: \(deviceName)")
+                }
+            }
+        })
     }
 }
 
@@ -971,13 +1177,19 @@ extension BestSender: NetServiceDelegate {
                 switch state {
                 case .ready:
                     self.addNotification(.success, "✅ Connected to \(device.name)")
+                    print("🎉 Successfully connected to \(device.name) - ready to send audio")
                 case .failed(let error):
                     self.addNotification(.error, "❌ Failed to connect to \(device.name): \(error.localizedDescription)")
+                    // 失敗した接続を削除
+                    self.connections.removeValue(forKey: device.host)
                 case .cancelled:
                     self.addNotification(.warning, "🚫 Connection to \(device.name) was cancelled")
+                    // キャンセルされた接続を削除
+                    self.connections.removeValue(forKey: device.host)
                 default:
                     break
                 }
+                // 状態変更のたびにデバイス接続ステータスを更新
                 self.updateDeviceConnectionStatus()
             }
         }
