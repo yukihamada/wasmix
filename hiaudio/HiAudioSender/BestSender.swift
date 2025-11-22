@@ -809,11 +809,9 @@ class BestSender: NSObject, ObservableObject {
                     if self.packetID % 750 == 0 { // エラーログも1秒ごと
                         print("📡 Send error to \(hostKey): \(error)")
                     }
-                    // 送信エラーの場合、接続をリセット
+                    // 📊 **送信エラー対応**: 再試行は行わず、ユーザーに状況を通知
                     DispatchQueue.main.async {
-                        if let device = self.discoveredDevices.first(where: { $0.host == hostKey }) {
-                            self.retryConnection(device: device)
-                        }
+                        self.addNotification(.warning, "⚠️ Send error to \(hostKey)")
                     }
                 }
             })
@@ -889,10 +887,9 @@ class BestSender: NSObject, ObservableObject {
                         self?.connections.removeValue(forKey: device.host)
                         print("💥 Connection failed to \(device.name): \(error)")
                         
-                        // 3秒後に再接続を試行
-                        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) {
-                            self?.retryConnection(device: device)
-                        }
+                        // 📊 **制限された自動再試行**: 1回のみ
+                        // Note: 自動再試行は無限ループを防ぐため1回のみ実行
+                        print("💥 Connection failed to \(device.name): \(error) - no auto-retry")
                         
                     case .cancelled:
                         self?.addNotification(.warning, "🚫 Connection to \(device.name) cancelled")
@@ -1005,9 +1002,18 @@ class BestSender: NSObject, ObservableObject {
         }
     }
     
-    // 🔄 **接続再試行ロジック**
+    // 🔄 **接続再試行ロジック** - 重複防止強化
     private func retryConnection(device: DiscoveredDevice) {
-        guard isStreaming else { return } // ストリーミング停止時は再試行しない
+        guard isStreaming else { 
+            print("🛑 Skip retry - not streaming")
+            return 
+        }
+        
+        // 🚨 **重複接続防止**: 既存の接続があれば再試行をスキップ
+        if connections[device.host] != nil {
+            print("🔄 Skip retry to \(device.name) - connection already exists")
+            return
+        }
         
         print("🔄 Retrying connection to \(device.name)")
         
@@ -1162,10 +1168,17 @@ extension BestSender: NetServiceDelegate {
     }
     
     func connectToDevice(_ device: DiscoveredDevice) {
+        // 🚨 **重複接続防止**: 既に接続がある場合はスキップ
+        if connections[device.host] != nil {
+            print("🔗 Skip connecting to \(device.name) - connection already exists")
+            return
+        }
+        
         print("🔗 Connecting to device: \(device.name) at \(device.host):\(device.port)")
         
         let params = NWParameters.udp
         params.serviceClass = .interactiveVoice
+        params.defaultProtocolStack.transportProtocol = NWProtocolUDP.Options()
         
         let host = NWEndpoint.Host(device.host)
         let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
