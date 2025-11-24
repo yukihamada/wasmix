@@ -32,7 +32,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         return super().do_GET()
 
 def main():
-    PORT = 8082
+    PORT = 8083
     
     # Change to the directory containing web-receiver.html
     script_dir = os.path.dirname(os.path.abspath(__file__))

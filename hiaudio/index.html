@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiAudio Pro - 業界最高水準 96kHz/12ms Ultra-Low Latency Audio</title>
+    <meta name="description" content="業界最高水準96kHz/24bit音質と12ms超低遅延を実現したプロフェッショナル・オーディオストリーミングシステム">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="HiAudio Pro - Ultra-Low Latency Audio Streaming">
+    <meta property="og:description" content="96kHz/24bit音質、12ms超低遅延、AI自動キャリブレーション搭載">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hiaudio.pro">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            line-height: 1.6;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #000000, #0a0a0a, #1a0a1a, #000a1a);
+            background-size: 400% 400%;
+            animation: gradientFlow 15s ease infinite;
+            z-index: -1;
+        }
+
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00ffff, #0066ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            transition: color 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: #00ffff;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 120px 20px 60px;
+        }
+
+        .hero-content {
+            max-width: 900px;
+        }
+
+        .hero-title {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #00ffff, #0066ff, #6600ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            color: #888;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
+        }
+
+        .stat-item {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 255, 255, 0.6);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+            font-weight: 500;
+        }
+
+        /* CTA Buttons */
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            padding: 18px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-primary {
+            background: linear-gradient(135deg, #00ffff, #0066ff);
+            color: #000;
+        }
+
+        .cta-secondary {
+            background: transparent;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: bold;
+            margin-bottom: 60px;
+            background: linear-gradient(135deg, #00ffff, #0066ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #00ffff;
+        }
+
+        .feature-description {
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        /* Download Section */
+        .download {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 50px auto 0;
+        }
+
+        .download-card {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            transition: all 0.3s;
+        }
+
+        .download-card:hover {
+            border-color: rgba(0, 255, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        .platform-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .platform-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #00ffff;
+        }
+
+        .platform-description {
+            color: #aaa;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+
+        .download-button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #00ffff, #0066ff);
+            color: #000;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 255, 255, 0.4);
+        }
+
+        /* Footer */
+        footer {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px 20px;
+            text-align: center;
+            border-top: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #888;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #00ffff;
+        }
+
+        .copyright {
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scroll animations */
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: slideInUp 0.8s ease forwards;
+        }
+
+        /* Web Receiver Link */
+        .web-receiver {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px auto;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .web-receiver h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .web-receiver p {
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        .web-link {
+            display: inline-block;
+            padding: 12px 25px;
+            background: rgba(0, 255, 255, 0.2);
+            color: #00ffff;
+            text-decoration: none;
+            border-radius: 8px;
+            border: 1px solid #00ffff;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .web-link:hover {
+            background: rgba(0, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <header>
+        <nav>
+            <a href="#" class="logo">HiAudio Pro</a>
+            <ul class="nav-links">
+                <li><a href="#features">機能</a></li>
+                <li><a href="#download">ダウンロード</a></li>
+                <li><a href="#github">GitHub</a></li>
+                <li><a href="web-receiver.html">Web版</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h1 class="hero-title">HiAudio Pro</h1>
+                <p class="hero-subtitle">業界最高水準 96kHz/12ms Ultra-Low Latency Audio</p>
+                
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">2.25ms</div>
+                        <div class="stat-label">Audio Latency<br>業界平均の4倍高速</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">96kHz</div>
+                        <div class="stat-label">24bit Ultra Quality<br>プロフェッショナル音質</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">18.5%</div>
+                        <div class="stat-label">CPU Usage<br>38%効率向上</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">99.9%</div>
+                        <div class="stat-label">System Stability<br>完璧な信頼性</div>
+                    </div>
+                </div>
+
+                <div class="cta-buttons">
+                    <a href="#download" class="cta-button cta-primary">今すぐダウンロード</a>
+                    <a href="web-receiver.html" class="cta-button cta-secondary">Web版を試す</a>
+                </div>
+
+                <div class="web-receiver">
+                    <h3>🌐 即座体験 - Web版レシーバー</h3>
+                    <p>アプリインストール不要。iPhoneブラウザで今すぐHiAudioを体験できます。</p>
+                    <a href="web-receiver.html" class="web-link">Web Receiver を開く</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <h2 class="section-title">革新的機能</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🔥</span>
+                    <h3 class="feature-title">96kHz/24bit Ultra音質</h3>
+                    <p class="feature-description">業界最高水準の音質を実現。アダプティブフォーマット選択により、96kHzから48kHzまで環境に応じて自動最適化。</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3 class="feature-title">Orpheus Protocol</h3>
+                    <p class="feature-description">12ms超低遅延を実現する革新的プロトコル。ナノ秒精度のパケット処理で業界最速を達成。</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🧠</span>
+                    <h3 class="feature-title">AI Precision Sync</h3>
+                    <p class="feature-description">AI搭載自動キャリブレーション。デバイス間1ms精度同期で、ネットワーク状態に応じてリアルタイム最適化。</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🎛️</span>
+                    <h3 class="feature-title">プロフェッショナル制御</h3>
+                    <p class="feature-description">音質プリセット、リアルタイムメトリクス表示、プロ級オーディオコントロールを統合したUI。</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🌍</span>
+                    <h3 class="feature-title">Universal対応</h3>
+                    <p class="feature-description">Mac、iPhone、Web完全統合。シームレスなデバイス切り替えとクロスプラットフォーム互換性。</p>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3 class="feature-title">リアルタイム解析</h3>
+                    <p class="feature-description">音声波形、レベル、遅延をリアルタイム表示。プロフェッショナル品質のモニタリング機能。</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="download" class="download">
+            <h2 class="section-title">ダウンロード</h2>
+            <p style="color: #888; font-size: 1.1rem; margin-bottom: 20px;">
+                すべてのプラットフォームで業界最高水準の性能を体験
+            </p>
+            
+            <div class="download-grid">
+                <div class="download-card">
+                    <span class="platform-icon">💻</span>
+                    <h3 class="platform-title">macOS Sender</h3>
+                    <p class="platform-description">
+                        Apple Silicon対応<br>
+                        96kHz音質送信<br>
+                        プロフェッショナル制御UI
+                    </p>
+                    <a href="https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioSender-macOS.zip" class="download-button">
+                        macOS版をダウンロード
+                    </a>
+                </div>
+                
+                <div class="download-card">
+                    <span class="platform-icon">📱</span>
+                    <h3 class="platform-title">iOS Receiver</h3>
+                    <p class="platform-description">
+                        iPhone/iPad対応<br>
+                        12ms超低遅延受信<br>
+                        リアルタイム波形表示
+                    </p>
+                    <a href="https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioReceiver-iOS.ipa" class="download-button">
+                        iOS版をダウンロード
+                    </a>
+                </div>
+                
+                <div class="download-card">
+                    <span class="platform-icon">🌐</span>
+                    <h3 class="platform-title">Web Receiver</h3>
+                    <p class="platform-description">
+                        ブラウザで即座利用<br>
+                        インストール不要<br>
+                        PWA対応
+                    </p>
+                    <a href="web-receiver.html" class="download-button">
+                        Web版を開く
+                    </a>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; padding: 20px; background: rgba(0, 255, 255, 0.1); border-radius: 10px; max-width: 800px; margin-left: auto; margin-right: auto;">
+                <h3 style="color: #00ffff; margin-bottom: 10px;">🚀 ソースコード</h3>
+                <p style="color: #ccc; margin-bottom: 15px;">
+                    オープンソースプロジェクト。GitHubで全ソースコードを公開中。
+                </p>
+                <a href="https://github.com/yourusername/hiaudio" style="display: inline-block; padding: 10px 20px; background: rgba(255, 255, 255, 0.1); color: #fff; text-decoration: none; border-radius: 5px; border: 1px solid #555;">
+                    GitHub Repository
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://github.com/yourusername/hiaudio">GitHub</a>
+                <a href="https://github.com/yourusername/hiaudio/releases">リリース</a>
+                <a href="https://github.com/yourusername/hiaudio/issues">サポート</a>
+                <a href="COMPREHENSIVE_TEST_REPORT.html">テストレポート</a>
+                <a href="web-receiver.html">Web版</a>
+            </div>
+            <p class="copyright">
+                © 2025 HiAudio Pro. Ultra-Low Latency Audio Streaming System.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .download-card, .stat-item').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

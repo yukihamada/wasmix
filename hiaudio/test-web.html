@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HiAudio Web Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            text-align: center;
+            padding: 50px;
+        }
+        .status {
+            font-size: 24px;
+            margin: 20px;
+        }
+        .success { color: #00ff88; }
+        .error { color: #ff3b30; }
+        button {
+            background: #00d9ff;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0099cc;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 HiAudio Web Test Page</h1>
+    
+    <div id="status" class="status">Testing connection...</div>
+    
+    <button onclick="testLocalhost()">Test localhost:3000</button>
+    <button onclick="testIP()">Test 192.168.0.194:3000</button>
+    <button onclick="testWebAudio()">Test Web Audio API</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        async function testLocalhost() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            try {
+                const response = await fetch('http://localhost:3000');
+                if (response.ok) {
+                    status.className = 'status success';
+                    status.textContent = '✅ localhost:3000 is working!';
+                    results.innerHTML = '<p>Response status: ' + response.status + '</p>';
+                } else {
+                    status.className = 'status error';
+                    status.textContent = '❌ localhost:3000 failed: ' + response.status;
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Connection failed: ' + error.message;
+            }
+        }
+        
+        async function testIP() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            try {
+                const response = await fetch('http://192.168.0.194:3000');
+                if (response.ok) {
+                    status.className = 'status success';
+                    status.textContent = '✅ 192.168.0.194:3000 is working!';
+                    results.innerHTML += '<p>IP Response status: ' + response.status + '</p>';
+                } else {
+                    status.className = 'status error';  
+                    status.textContent = '❌ IP connection failed: ' + response.status;
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ IP Connection failed: ' + error.message;
+            }
+        }
+        
+        async function testWebAudio() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                status.className = 'status success';
+                status.textContent = '✅ Web Audio API is supported!';
+                results.innerHTML += '<p>Audio Context State: ' + audioContext.state + '</p>';
+                results.innerHTML += '<p>Sample Rate: ' + audioContext.sampleRate + 'Hz</p>';
+                
+                // Test microphone access
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    results.innerHTML += '<p>✅ Microphone access granted</p>';
+                    stream.getTracks().forEach(track => track.stop());
+                } else {
+                    results.innerHTML += '<p>⚠️ Microphone API not available</p>';
+                }
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Web Audio API failed: ' + error.message;
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = function() {
+            testLocalhost();
+        }
+    </script>
+</body>
+</html>

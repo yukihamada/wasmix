@@ -1,0 +1,123 @@
+# Xcode
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+*.xcworkspace
+!default.xcworkspace
+contents.xcworkspacedata
+IDEWorkspaceChecks.plist
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code Injection
+iOSInjectionProject/
+
+# Release builds
+releases/
+*.dmg
+*.zip
+
+# Logs
+*.log
+web-server.log
+mac_sender_debug.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Claude files
+../.claude*
+../.anthropic/
+../.CFUserTextEncoding
+../.android/
+../.app-store/
+../.appium/
+../.appstoreconnect/
+../.aws/
+../.bash*
+../.bee_history
+../.bigqueryrc
+../.boto
+../.bun/
+../.bundle/
+../.cache/
+../.cargo/
+../.cdk/
+../.chainlit/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Archives
+*.tar.gz
+*.tgz
+*.tar
+*.zip
+*.rar
+*.7z

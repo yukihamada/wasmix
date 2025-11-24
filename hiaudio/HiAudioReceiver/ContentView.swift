@@ -38,6 +38,8 @@ struct ContentView: View {
                 statsGridView
                 if receiver.isReceiving {
                     quickSettingsView
+                    proControlsView
+                    aiMetricsView
                 }
                 Spacer(minLength: 30)
             }
@@ -1884,6 +1886,161 @@ struct AudioWaveformView: View {
                 waveformBars[index] = min(1.0, waveformBars[index] + strength * falloff)
             }
         }
+    }
+}
+
+// MARK: - Pro Controls Extension
+extension ContentView {
+    
+    // 🔥 **PRO CONTROLS VIEW** - Professional audio controls
+    private var proControlsView: some View {
+        VStack(spacing: 15) {
+            HStack {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.cyan)
+                
+                Text("PRO CONTROLS")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            // Audio Quality Preset
+            VStack(spacing: 8) {
+                HStack {
+                    Text("QUALITY PRESET")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Text("ULTRA (96kHz)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.green)
+                }
+                
+                // Quality indicator bars
+                HStack(spacing: 3) {
+                    ForEach(0..<8, id: \.self) { index in
+                        Rectangle()
+                            .fill(index < 7 ? Color.green : Color.green.opacity(0.3))
+                            .frame(height: 4)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            
+            // Ultra-low Latency Control
+            VStack(spacing: 8) {
+                HStack {
+                    Text("TARGET LATENCY")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Text("\(String(format: "%.1f", receiver.targetLatencyMs))ms")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.orange)
+                }
+                
+                Slider(value: Binding(
+                    get: { receiver.targetLatencyMs },
+                    set: { receiver.setTargetLatency($0) }
+                ), in: 5.0...50.0, step: 1.0)
+                .accentColor(.orange)
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 15)
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.black.opacity(0.6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
+    }
+    
+    // 🧠 **AI METRICS VIEW** - AI calibration status
+    private var aiMetricsView: some View {
+        VStack(spacing: 15) {
+            HStack {
+                Image(systemName: "brain")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.blue)
+                
+                Text("AI PRECISION SYNC")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.blue)
+                
+                Spacer()
+                
+                Circle()
+                    .fill(receiver.aiTuningActive ? Color.green : Color.gray)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(receiver.aiTuningActive ? 1.3 : 1.0)
+                    .animation(.easeInOut(duration: 1.0).repeatForever(), value: receiver.aiTuningActive)
+            }
+            .padding(.horizontal)
+            
+            // AI Metrics Grid
+            HStack(spacing: 15) {
+                VStack(spacing: 4) {
+                    Text("ACCURACY")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    Text("\(String(format: "%.2f", receiver.aiSyncAccuracy))ms")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(.blue)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("OPTIMIZATION")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    Text("\(String(format: "%.0f", receiver.hardwareOptimization))%")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(.blue)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("PREDICTION")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    Text(receiver.predictiveCorrection ? "ON" : "OFF")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(receiver.predictiveCorrection ? .green : .gray)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("ADAPTIVE")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray)
+                    Text(receiver.adaptiveBuffering ? "ON" : "OFF")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(receiver.adaptiveBuffering ? .green : .gray)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 15)
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.black.opacity(0.6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
     }
 }
 

@@ -1,0 +1,247 @@
+name: Deploy HiAudio Pro to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  # Build job
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Create build directory
+        run: |
+          mkdir -p _site
+          
+      - name: Copy website files
+        run: |
+          # Copy main website files
+          cp index.html _site/
+          cp web-receiver.html _site/
+          cp COMPREHENSIVE_TEST_REPORT.md _site/
+          cp README.md _site/
+          
+          # Copy test files for transparency
+          cp QuickBenchmark.swift _site/
+          cp RealDeviceTest.swift _site/
+          cp TestRunner.swift _site/
+          
+          # Create downloads directory structure
+          mkdir -p _site/downloads
+          
+          # Create placeholder release files (real files would be uploaded to GitHub Releases)
+          echo "# HiAudio Pro Downloads" > _site/downloads/README.md
+          echo "Download links redirect to GitHub Releases" >> _site/downloads/README.md
+          
+          # Copy build scripts for transparency
+          cp build-release.sh _site/
+          cp export-options-*.plist _site/ || true
+          
+      - name: Create redirect pages for downloads
+        run: |
+          # Create redirect for macOS download
+          cat > _site/downloads/macos.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Downloading HiAudio Pro for macOS...</title>
+            <meta http-equiv="refresh" content="0; url=https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioSender-macOS.zip">
+            <style>
+              body { font-family: -apple-system, sans-serif; text-align: center; padding: 50px; background: #000; color: #fff; }
+              .loading { font-size: 1.2rem; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>🔥 HiAudio Pro for macOS</h1>
+            <div class="loading">Downloading...</div>
+            <p>If the download doesn't start automatically, <a href="https://github.com/yourusername/hiaudio/releases/latest" style="color: #00ffff;">click here</a>.</p>
+            <script>
+              setTimeout(() => {
+                window.location.href = "https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioSender-macOS.zip";
+              }, 1000);
+            </script>
+          </body>
+          </html>
+          EOF
+          
+          # Create redirect for iOS download  
+          cat > _site/downloads/ios.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Downloading HiAudio Pro for iOS...</title>
+            <meta http-equiv="refresh" content="0; url=https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioReceiver-iOS.ipa">
+            <style>
+              body { font-family: -apple-system, sans-serif; text-align: center; padding: 50px; background: #000; color: #fff; }
+              .loading { font-size: 1.2rem; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>📱 HiAudio Pro for iOS</h1>
+            <div class="loading">Downloading...</div>
+            <p>Requires AltStore or Sideloadly for installation.</p>
+            <p>If the download doesn't start automatically, <a href="https://github.com/yourusername/hiaudio/releases/latest" style="color: #00ffff;">click here</a>.</p>
+            <script>
+              setTimeout(() => {
+                window.location.href = "https://github.com/yourusername/hiaudio/releases/latest/download/HiAudioReceiver-iOS.ipa";
+              }, 1000);
+            </script>
+          </body>
+          </html>
+          EOF
+          
+      - name: Create 404 page
+        run: |
+          cat > _site/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>404 - Page Not Found | HiAudio Pro</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                background: linear-gradient(135deg, #000000, #1a0a1a);
+                color: #fff;
+                text-align: center;
+                padding: 50px;
+                min-height: 100vh;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+              }
+              h1 { font-size: 4rem; color: #00ffff; margin: 0; }
+              h2 { font-size: 1.5rem; margin: 20px 0; }
+              .links { margin-top: 30px; }
+              .links a {
+                display: inline-block;
+                padding: 15px 25px;
+                margin: 10px;
+                background: rgba(0, 255, 255, 0.1);
+                color: #00ffff;
+                text-decoration: none;
+                border-radius: 8px;
+                border: 1px solid #00ffff;
+                transition: all 0.3s;
+              }
+              .links a:hover {
+                background: rgba(0, 255, 255, 0.2);
+                transform: translateY(-2px);
+              }
+            </style>
+          </head>
+          <body>
+            <h1>404</h1>
+            <h2>Page Not Found</h2>
+            <p>このページは存在しません。</p>
+            <div class="links">
+              <a href="/">🏠 ホーム</a>
+              <a href="/web-receiver.html">🌐 Web版</a>
+              <a href="https://github.com/yourusername/hiaudio">📂 GitHub</a>
+            </div>
+          </body>
+          </html>
+          EOF
+          
+      - name: Create manifest.json for PWA
+        run: |
+          cat > _site/manifest.json << 'EOF'
+          {
+            "name": "HiAudio Pro - Ultra-Low Latency Audio",
+            "short_name": "HiAudio Pro",
+            "description": "業界最高水準96kHz/12ms超低遅延オーディオストリーミング",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#000000",
+            "theme_color": "#00ffff",
+            "orientation": "portrait-primary",
+            "icons": [
+              {
+                "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2300ffff'/%3E%3Ctext x='50' y='60' font-size='40' text-anchor='middle' fill='%23000'%3E🔊%3C/text%3E%3C/svg%3E",
+                "sizes": "192x192",
+                "type": "image/svg+xml"
+              }
+            ],
+            "categories": ["music", "productivity", "utilities"]
+          }
+          EOF
+          
+      - name: Create robots.txt
+        run: |
+          cat > _site/robots.txt << 'EOF'
+          User-agent: *
+          Allow: /
+          
+          Sitemap: https://yourusername.github.io/hiaudio/sitemap.xml
+          EOF
+          
+      - name: Create sitemap.xml
+        run: |
+          cat > _site/sitemap.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url>
+              <loc>https://yourusername.github.io/hiaudio/</loc>
+              <lastmod>2025-11-24</lastmod>
+              <changefreq>weekly</changefreq>
+              <priority>1.0</priority>
+            </url>
+            <url>
+              <loc>https://yourusername.github.io/hiaudio/web-receiver.html</loc>
+              <lastmod>2025-11-24</lastmod>
+              <changefreq>weekly</changefreq>
+              <priority>0.9</priority>
+            </url>
+            <url>
+              <loc>https://yourusername.github.io/hiaudio/COMPREHENSIVE_TEST_REPORT.html</loc>
+              <lastmod>2025-11-24</lastmod>
+              <changefreq>monthly</changefreq>
+              <priority>0.7</priority>
+            </url>
+          </urlset>
+          EOF
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  # Deployment job
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access to stream audio to other devices.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app uses the local network to stream audio to other devices.</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_hiaudio._udp</string>
+	</array>
+</dict>
+</plist>

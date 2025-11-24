@@ -584,9 +584,10 @@ class BestSender: NSObject, ObservableObject {
     private var recordingTimer: Timer?             // 録音時間更新
     
     // 🎛️ **リアルタイム設定切り替え**
-    @Published var selectedSampleRate: Double = 96000 // サンプルレート
-    @Published var selectedChannels: UInt32 = 2        // チャンネル数
-    @Published var selectedBufferSize: UInt32 = 128    // 🔧 バッファサイズ（UDP MTU制限のため128に変更）
+    @Published var audioQuality: AudioQuality = .ultra // 🔥 DEFAULT ULTRA QUALITY
+    @Published var selectedSampleRate: Double = 96000  // サンプルレート (Ultra品質)
+    @Published var selectedChannels: UInt32 = 2         // チャンネル数 (Ultra品質ステレオ)
+    @Published var selectedBufferSize: UInt32 = 128     // 🔧 バッファサイズ（UDP MTU制限のため128に変更）
     @Published var noiseReductionEnabled: Bool = true  // ノイズリダクション
     @Published var agcEnabled: Bool = true             // AGC自動ゲイン制御
     @Published var compressionEnabled: Bool = true     // マルチバンド圧縮
@@ -621,6 +622,19 @@ class BestSender: NSObject, ObservableObject {
     override init() {
         super.init()
         print("🚀 BestSender初期化開始")
+        
+        // 🔥 **ULTRA QUALITY INITIALIZATION**: Ensure highest quality settings
+        audioQuality = .ultra
+        selectedSampleRate = audioQuality.sampleRate    // 96kHz for Ultra
+        selectedChannels = audioQuality.channels        // Stereo for Ultra
+        selectedBufferSize = audioQuality.bufferSize    // Optimized buffer size
+        
+        print("🔥 ULTRA QUALITY ENABLED:")
+        print("   - Sample Rate: \(selectedSampleRate)Hz")
+        print("   - Channels: \(selectedChannels) (stereo)")
+        print("   - Buffer Size: \(selectedBufferSize) frames")
+        print("   - Quality Mode: \(audioQuality.description)")
+        
         startDiscovering()
         
         // 📱 **テザリング環境での物理iPhone自動追加**
@@ -628,7 +642,7 @@ class BestSender: NSObject, ObservableObject {
             self.addManualDevice(ip: "172.20.10.1", name: "Physical iPhone (Tethered)")
         }
         
-        print("✅ BestSender初期化完了")
+        print("✅ BestSender初期化完了 (ULTRA QUALITY)")
     }
     
     deinit {
@@ -668,14 +682,25 @@ class BestSender: NSObject, ObservableObject {
     }
 
     private func setupAudio() {
-        // 🎛️ **ハードウェア対応**: 利用可能な最適サンプルレートを使用
+        // 🔥 **ULTRA QUALITY AUDIO SETUP**: Push for highest quality possible
         let input = engine.inputNode
         let hwFormat = input.inputFormat(forBus: 0)
         
         print("🔊 Hardware format: \(hwFormat.sampleRate)Hz, \(hwFormat.channelCount)ch")
+        print("🔥 Requested ULTRA format: \(selectedSampleRate)Hz, \(selectedChannels)ch")
         
-        // ハードウェアサンプルレートを使用（またはサポートされている最も近い値）
-        let actualSampleRate = hwFormat.sampleRate
+        // 🚀 **ATTEMPT ULTRA QUALITY**: Try to get as close to 96kHz as possible
+        let requestedSampleRate = selectedSampleRate  // 96kHz for Ultra
+        let actualSampleRate: Double
+        
+        if hwFormat.sampleRate >= 90000 { // Hardware supports near 96kHz
+            actualSampleRate = hwFormat.sampleRate
+            print("🔥 ULTRA SUCCESS: Using hardware \(actualSampleRate)Hz")
+        } else {
+            actualSampleRate = max(hwFormat.sampleRate, 48000)  // Best available
+            print("🔥 ULTRA FALLBACK: Using \(actualSampleRate)Hz (hardware limit)")
+        }
+        
         let actualChannels = min(selectedChannels, UInt32(hwFormat.channelCount))
         let format = AVAudioFormat(standardFormatWithSampleRate: actualSampleRate, channels: actualChannels)!
         
