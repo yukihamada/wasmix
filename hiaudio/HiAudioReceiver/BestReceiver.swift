@@ -219,38 +219,73 @@ class JitterBuffer {
     private var targetBufferSize: Int = 3 // 3パケット分をバッファ
     private var isStarted = false
     
+    // 🕰️ **時間ベースレイテンシー制御**
+    private var targetLatencyMs: Double = 50.0 // デフォルト50ms
+    private var firstPacketTime: CFAbsoluteTime = 0
+    private var playbackStartTime: CFAbsoluteTime = 0
+    
     func add(_ packet: AudioPacket) {
         buffer.append(packet)
         buffer.sort { $0.id < $1.id }
         
+        // 最初のパケット時刻を記録
+        if firstPacketTime == 0 {
+            firstPacketTime = packet.timestamp
+            playbackStartTime = firstPacketTime + (targetLatencyMs / 1000.0) // 50ms遅延
+            print("⏱️ First packet received, playback will start in \(targetLatencyMs)ms")
+        }
+        
         print("🔄 Buffer: \(buffer.count)/\(targetBufferSize), packet \(packet.id), started: \(isStarted)")
         
-        // バッファが溜まったら再生開始
-        if !isStarted && buffer.count >= targetBufferSize {
+        // 時間ベースで再生開始を判定
+        let currentTime = CFAbsoluteTimeGetCurrent()
+        let timeBasedReady = currentTime >= playbackStartTime
+        let bufferBasedReady = buffer.count >= targetBufferSize
+        
+        if !isStarted && (timeBasedReady || bufferBasedReady) {
             isStarted = true
-            print("✅ Jitter buffer started! Buffer size: \(buffer.count)")
+            let actualDelay = (currentTime - firstPacketTime) * 1000.0
+            print("✅ Jitter buffer started! Actual delay: \(String(format: "%.1f", actualDelay))ms, Buffer size: \(buffer.count)")
         }
         
         // バッファが大きくなりすぎたら古いものを削除
-        if buffer.count > targetBufferSize * 2 {
+        if buffer.count > targetBufferSize * 3 {
             buffer.removeFirst()
+            print("📦 Removed old packet from buffer")
         }
     }
     
     func getNext() -> AudioPacket? {
         guard isStarted && !buffer.isEmpty else { return nil }
-        return buffer.removeFirst()
+        let packet = buffer.removeFirst()
+        
+        // レイテンシーデバッグ情報 (最初の10パケット)
+        if packet.id <= 10 {
+            let currentTime = CFAbsoluteTimeGetCurrent()
+            let actualLatency = (currentTime - packet.timestamp) * 1000.0
+            print("🔊 Playing packet \(packet.id), latency: \(String(format: "%.1f", actualLatency))ms")
+        }
+        
+        return packet
     }
     
     func reset() {
         buffer.removeAll()
         isStarted = false
+        firstPacketTime = 0
+        playbackStartTime = 0
     }
     
     var currentSize: Int { buffer.count }
     
     func updateBufferSize(_ newSize: Int) {
         targetBufferSize = max(1, min(10, newSize))
+    }
+    
+    // 🎛️ **レイテンシー調整機能**
+    func setTargetLatency(_ latencyMs: Double) {
+        targetLatencyMs = max(10.0, min(200.0, latencyMs)) // 10-200ms範囲
+        print("🎯 Target latency set to: \(String(format: "%.1f", targetLatencyMs))ms")
     }
 }
 
@@ -276,6 +311,7 @@ class BestReceiver: NSObject, ObservableObject {
     @Published var outputVolume: Float = 1.0               // 出力音量 0.0-1.0
     @Published var autoReconnectEnabled: Bool = true       // 自動再接続
     @Published var jitterBufferSize: Int = 3               // ジッターバッファサイズ
+    @Published var targetLatencyMs: Double = 50.0          // 目標レイテンシー (デフォルト50ms)
     
     // 🔥 **ORPHEUS PROTOCOL - Dante Surpassing Performance**
     @Published var orpheusEnabled: Bool = true              // Orpheus Protocol有効/無効
@@ -298,28 +334,19 @@ class BestReceiver: NSObject, ObservableObject {
     private var audioRecorder: HiAudioRecorder?
     
     private var lastProcessedID: UInt64 = 0
-    // 🎵 **ULTRA-HIGH QUALITY**: 96kHz ステレオ対応 (送信側と同期)
-    private let format: AVAudioFormat = {
-        let session = AVAudioSession.sharedInstance()
-        let preferredSampleRate = 96000.0
-        let fallbackSampleRate = 48000.0
+    // 🎵 **CORRECTED FORMAT**: Use 48kHz stereo (realistic iOS configuration)
+    private lazy var format: AVAudioFormat = {
+        // Don't configure session here - that's done in setupAudioSession()
+        // Use conservative 48kHz stereo format that works on all iOS devices
+        let sampleRate = 48000.0  // 48kHz standard for iOS
+        let channels: UInt32 = 2   // Stereo
         
-        // Try to configure audio session for preferred rate
-        do {
-            try session.setPreferredSampleRate(preferredSampleRate)
-            print("🎛️ Requested sample rate: \(preferredSampleRate)Hz")
-        } catch {
-            print("⚠️ Could not set preferred sample rate: \(error)")
+        guard let audioFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels) else {
+            fatalError("❌ Could not create audio format with \(sampleRate)Hz stereo")
         }
         
-        let actualRate = session.sampleRate
-        print("🔊 iOS Audio Session rate: \(actualRate)Hz")
-        
-        // Use actual session rate or fallback
-        let useRate = actualRate > 0 ? actualRate : fallbackSampleRate
-        print("✅ Using sample rate: \(useRate)Hz")
-        
-        return AVAudioFormat(standardFormatWithSampleRate: useRate, channels: 2)!
+        print("🎵 Audio format initialized: \(sampleRate)Hz, \(channels) channels")
+        return audioFormat
     }()
     
     // 高品質化機能
@@ -352,6 +379,12 @@ class BestReceiver: NSObject, ObservableObject {
         
         // 🕰️ Initialize Clock Recovery for long-term stability
         setupClockRecovery()
+        
+        // 🎯 **レイテンシー初期化**: デフォルト50ms
+        setTargetLatency(50.0)
+        
+        print("✅ BestReceiver initialized with device: \(deviceName)")
+        print("🎯 Default target latency: \(targetLatencyMs)ms")
     }
     
     private func setupRecorder() {
@@ -557,6 +590,10 @@ class BestReceiver: NSObject, ObservableObject {
             setupNetwork()
         }
         
+        // 🚨 **強制的にネットワーク起動** - シミュレータ対応
+        print("🔧 Force starting network listener...")
+        setupNetwork()
+        
         startBonjourAdvertising()
         startPlaybackTimer()
         isReceiving = true
@@ -574,69 +611,308 @@ class BestReceiver: NSObject, ObservableObject {
     func stop() {
         guard isReceiving else { return }
         
-        engine.stop()
-        playerNode.stop()
+        print("🛑 Stopping HiAudio receiver...")
+        
+        // 🎛️ **STOP AUDIO ENGINE GRACEFULLY**
+        if engine.isRunning {
+            playerNode.stop()
+            engine.stop()
+            print("✅ Audio engine stopped")
+        }
+        
+        // 📡 **STOP NETWORK**
         listener?.cancel()
         listener = nil
+        print("✅ Network listener stopped")
+        
+        // ⏱️ **STOP TIMERS**
         playbackTimer?.invalidate()
         playbackTimer = nil
-        jitterBuffer.reset()
+        print("✅ Playback timer stopped")
         
-        // 🕰️ Stop Clock Recovery
+        // 🔄 **RESET BUFFERS**
+        jitterBuffer.reset()
+        print("✅ Jitter buffer reset")
+        
+        // 🕰️ **STOP CLOCK RECOVERY**
         clockRecoveryController?.stop()
         clockRecoveryController = nil
+        print("✅ Clock recovery stopped")
         
+        // 📻 **STOP BONJOUR**
         stopBonjourAdvertising()
         
+        // 🎧 **CLEANUP AUDIO INTERRUPTION OBSERVERS**
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
+        print("✅ Audio interruption observers removed")
+        
+        // 🔇 **DEACTIVATE AUDIO SESSION**
         do {
-            try AVAudioSession.sharedInstance().setActive(false)
+            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            print("✅ Audio session deactivated")
         } catch {
-            print("Failed to deactivate audio session: \(error)")
+            print("⚠️ Failed to deactivate audio session: \(error)")
         }
         
         isReceiving = false
+        print("🏁 HiAudio receiver stopped successfully")
     }
     
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
             
-            // 🚀 **超低遅延プロ設定**
+            // 🚀 **FIXED: Proper playback configuration**
+            // Use .measurement mode instead of .voiceChat for high-quality audio playback
+            // Add .defaultToSpeaker to ensure audio plays through speakers, not earpiece
             try session.setCategory(.playback, 
-                                  mode: .voiceChat,  // VoiceChatモードで最低遅延
-                                  options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
+                                  mode: .measurement,  // High-quality audio mode
+                                  options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker])
             
-            // 🎵 **ULTRA-HIGH QUALITY** 超低遅延設定: 96kHz ステレオ
-            try session.setPreferredSampleRate(96000)       // 96kHz 高品質
-            try session.setPreferredIOBufferDuration(0.0013) // 1.33ms = 96kHz での128フレーム
-            try session.setPreferredInputNumberOfChannels(2) // ステレオ入力対応
-            try session.setPreferredOutputNumberOfChannels(2) // ステレオ出力
+            // 🎵 **REALISTIC SAMPLE RATE**: Use 48kHz instead of 96kHz (iOS standard)
+            // Most iOS devices don't support 96kHz, fallback to 48kHz for better compatibility
+            let preferredSampleRate: Double = 48000  // 48kHz is widely supported
+            try session.setPreferredSampleRate(preferredSampleRate)
+            
+            // 🎵 **CONSERVATIVE BUFFER**: Use less aggressive buffer duration for stability
+            let preferredBufferDuration: TimeInterval = 0.005  // 5ms = 240 frames at 48kHz
+            try session.setPreferredIOBufferDuration(preferredBufferDuration)
+            
+            // 🎵 **PLAYBACK ONLY**: Remove input channel configuration for receiver
+            // Only set output channels for playback-only device
+            try session.setPreferredOutputNumberOfChannels(2) // Stereo output
+            
+            // ✅ **VALIDATE BEFORE ACTIVATION**: Check if configurations are accepted
+            print("🎛️ Audio session configuration requested:")
+            print("   - Sample Rate: \(preferredSampleRate)Hz")
+            print("   - Buffer Duration: \(preferredBufferDuration * 1000)ms")
+            print("   - Output Channels: 2 (stereo)")
             
             try session.setActive(true)
             
+            // 📊 **VERIFY ACTUAL SETTINGS**: Log what was actually configured
             let actualRate = session.sampleRate
-            let actualBuffer = session.ioBufferDuration * 1000 // ms変換
-            print("🎵 Audio session optimized: \(actualRate)Hz, \(String(format: "%.1f", actualBuffer))ms buffer")
+            let actualBuffer = session.ioBufferDuration * 1000 // ms conversion
+            let actualOutputChannels = session.outputNumberOfChannels
+            let actualCategory = session.category
+            let actualMode = session.mode
+            
+            print("🎵 Audio session activated successfully:")
+            print("   ✅ Sample Rate: \(actualRate)Hz")
+            print("   ✅ Buffer Duration: \(String(format: "%.1f", actualBuffer))ms")
+            print("   ✅ Output Channels: \(actualOutputChannels)")
+            print("   ✅ Category: \(actualCategory)")
+            print("   ✅ Mode: \(actualMode)")
+            
+            // ⚠️ **WARNING CHECKS**: Alert if fallback values are being used
+            if actualRate != preferredSampleRate {
+                print("⚠️ Sample rate fallback: requested \(preferredSampleRate)Hz, got \(actualRate)Hz")
+            }
+            
+            if abs(session.ioBufferDuration - preferredBufferDuration) > 0.001 {
+                print("⚠️ Buffer duration fallback: requested \(preferredBufferDuration * 1000)ms, got \(actualBuffer)ms")
+            }
+            
+            if actualOutputChannels != 2 {
+                print("⚠️ Channel fallback: requested 2 channels, got \(actualOutputChannels)")
+            }
+            
+            // 🎧 **SETUP INTERRUPTION HANDLING**
+            setupAudioInterruptionHandling(session)
             
         } catch {
-            print("Failed to setup audio session: \(error)")
+            print("❌ Failed to setup audio session: \(error)")
+            print("🔧 This might prevent audio playback. Check device audio permissions.")
+            
+            // 🚑 **FALLBACK**: Try minimal configuration
+            setupFallbackAudioSession()
+        }
+    }
+    
+    private func setupAudioInterruptionHandling(_ session: AVAudioSession) {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: session
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: session
+        )
+        
+        print("🎧 Audio interruption handling configured")
+    }
+    
+    @objc private func handleAudioInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            print("🔇 Audio interrupted - pausing playback")
+            // Player node will automatically pause
+            
+        case .ended:
+            print("🔊 Audio interruption ended - resuming playback")
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+                // Engine and player node should auto-resume
+            } catch {
+                print("❌ Failed to reactivate audio session after interruption: \(error)")
+            }
+            
+        @unknown default:
+            break
+        }
+    }
+    
+    @objc private func handleRouteChange(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        switch reason {
+        case .newDeviceAvailable:
+            print("🎧 New audio device available - route changed")
+        case .oldDeviceUnavailable:
+            print("🔌 Audio device disconnected - route changed")
+        default:
+            print("🔀 Audio route changed: \(reason)")
+        }
+        
+        // Log current route for debugging
+        let session = AVAudioSession.sharedInstance()
+        print("📱 Current audio route: \(session.currentRoute.outputs.map { $0.portName })")
+    }
+    
+    private func setupFallbackAudioSession() {
+        print("🚑 Setting up fallback audio session...")
+        
+        do {
+            let session = AVAudioSession.sharedInstance()
+            
+            // Minimal safe configuration
+            try session.setCategory(.playback, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            
+            print("✅ Fallback audio session activated")
+            print("   - Category: \(session.category)")
+            print("   - Sample Rate: \(session.sampleRate)Hz")
+            
+        } catch {
+            print("❌ Even fallback audio session failed: \(error)")
+            print("🚨 Device may have audio hardware issues or insufficient permissions")
         }
     }
     
     private func setupEngine() {
+        // 📊 **VALIDATE SESSION ALIGNMENT**: Ensure format matches actual session
+        let session = AVAudioSession.sharedInstance()
+        let sessionRate = session.sampleRate
+        let formatRate = format.sampleRate
+        
+        if abs(sessionRate - formatRate) > 1.0 {
+            print("⚠️ WARNING: Format mismatch!")
+            print("   Session rate: \(sessionRate)Hz")
+            print("   Format rate: \(formatRate)Hz")
+            print("   This may cause audio issues.")
+        }
+        
+        // 🔧 **ATTACH AND CONNECT NODES**
         engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: format)
-        // ノードを事前に温めておく
+        
+        do {
+            engine.connect(playerNode, to: engine.mainMixerNode, format: format)
+            print("🔗 Audio nodes connected with format: \(format)")
+        } catch {
+            print("❌ Failed to connect audio nodes: \(error)")
+            return
+        }
+        
+        // 🚀 **PREPARE ENGINE** - Pre-warm for optimal performance
         engine.prepare()
-        print("🎛️ Audio engine prepared with format: \(format)")
+        print("🎛️ Audio engine prepared successfully")
         
         do {
             try engine.start()
             print("✅ Audio engine started: \(engine.isRunning)")
-            playerNode.play()
-            print("✅ Player node playing: \(playerNode.isPlaying)")
+            
+            // ▶️ **START PLAYER NODE**
+            if !playerNode.isPlaying {
+                playerNode.play()
+                print("✅ Player node started: \(playerNode.isPlaying)")
+            }
+            
+            // 📊 **VERIFY ENGINE STATE**
+            verifyEngineState()
+            
         } catch {
             print("❌ Failed to start audio engine: \(error)")
+            print("🔧 Common causes:")
+            print("   - Audio session not properly configured")
+            print("   - Hardware audio issues")
+            print("   - Format incompatibility")
+            
+            // 🚑 **ATTEMPT ENGINE RECOVERY**
+            attemptEngineRecovery()
+        }
+    }
+    
+    private func verifyEngineState() {
+        let isEngineRunning = engine.isRunning
+        let isPlayerPlaying = playerNode.isPlaying
+        let engineFormat = engine.mainMixerNode.outputFormat(forBus: 0)
+        
+        print("🔍 Engine verification:")
+        print("   Engine running: \(isEngineRunning)")
+        print("   Player playing: \(isPlayerPlaying)")
+        print("   Engine format: \(engineFormat.sampleRate)Hz, \(engineFormat.channelCount) channels")
+        
+        if !isEngineRunning {
+            print("⚠️ Engine not running - audio will not play")
+        }
+        
+        if !isPlayerPlaying {
+            print("⚠️ Player node not playing - audio will not play")
+        }
+    }
+    
+    private func attemptEngineRecovery() {
+        print("🚑 Attempting engine recovery...")
+        
+        // Stop everything cleanly
+        engine.stop()
+        engine.reset()
+        
+        // Try with a simpler configuration
+        do {
+            engine.attach(playerNode)
+            
+            // Use engine's output format instead of our custom format
+            let engineOutputFormat = engine.outputNode.inputFormat(forBus: 0)
+            print("🔄 Trying engine output format: \(engineOutputFormat)")
+            
+            engine.connect(playerNode, to: engine.mainMixerNode, format: engineOutputFormat)
+            engine.prepare()
+            
+            try engine.start()
+            playerNode.play()
+            
+            print("✅ Engine recovery successful with format: \(engineOutputFormat)")
+            
+        } catch {
+            print("❌ Engine recovery failed: \(error)")
+            print("🚨 Audio playback will not work - manual intervention required")
         }
     }
     
@@ -646,26 +922,50 @@ class BestReceiver: NSObject, ObservableObject {
             return
         }
         
-        // Start Orpheus receiver with ultra-low latency configuration
-        // orpheusReceiver.startListening(on: UInt16(HiAudioService.udpPort))
+        // 🔧 **FIXED**: Orpheus components are not fully implemented, fallback to legacy UDP
+        print("🔧 Orpheus Protocol components not available - falling back to legacy UDP")
+        print("🔄 Setting up standard Network framework UDP listener...")
+        
+        setupNetwork() // Always use standard UDP for now
         
         print("🔥 Orpheus network receiver started on port \(HiAudioService.udpPort)")
         print("🎯 Target performance: <1ms latency, <0.1ms jitter, >99.99% reliability")
     }
     
     private func setupNetwork() {
+        print("🔧 Setting up UDP listener on port \(HiAudioService.udpPort)")
+        
         let params = NWParameters.udp
         params.serviceClass = .interactiveVoice
         
         do {
             listener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: HiAudioService.udpPort))
+            
+            listener?.stateUpdateHandler = { state in
+                print("🔄 UDP Listener state: \(state)")
+                switch state {
+                case .ready:
+                    print("✅ UDP listener ready on port \(HiAudioService.udpPort)")
+                case .failed(let error):
+                    print("❌ UDP listener failed: \(error)")
+                case .cancelled:
+                    print("🚫 UDP listener cancelled")
+                default:
+                    break
+                }
+            }
+            
             listener?.newConnectionHandler = { conn in
+                print("📡 New UDP connection established")
                 conn.start(queue: DispatchQueue.global(qos: .userInteractive))
                 self.receiveLoop(conn)
             }
+            
             listener?.start(queue: DispatchQueue.global())
+            print("🚀 UDP listener started successfully")
+            
         } catch {
-            print("Failed to start network listener: \(error)")
+            print("❌ Failed to start network listener: \(error)")
         }
     }
     
@@ -697,6 +997,12 @@ class BestReceiver: NSObject, ObservableObject {
                 }
                 
                 print("📱 Received \(data.count) bytes, orpheusEnabled: \(self.orpheusEnabled)")
+                
+                // 🔍 **Enhanced debugging**: Log first few packets regardless of mode
+                if self.packetsReceived < 10 {
+                    print("🔍 DEBUG: Early packet \(self.packetsReceived + 1) received (\(data.count) bytes)")
+                }
+                
                 if self.orpheusEnabled {
                     // 🔥 Process with Orpheus Protocol for ultra-precision
                     self.processOrpheusPacket(data)
@@ -792,13 +1098,19 @@ class BestReceiver: NSObject, ObservableObject {
     }
     
     private func play(_ data: Data) {
+        // 🔊 **DEBUGGING**: Log every play() call for the first few packets
+        if packetsReceived < 20 {
+            print("🔊 play() called with \(data.count) bytes, packet #\(packetsReceived + 1)")
+            print("🔊 Engine running: \(engine.isRunning), Player playing: \(playerNode.isPlaying)")
+        }
+        
         // 🎵 **STEREO 96kHz** Data -> PCM Buffer変換 (ステレオ対応)
         let channels = Int(format.channelCount)
         let bytesPerSample = 4 // Float32
         let frameCount = UInt32(data.count) / UInt32(bytesPerSample * channels)
         
         guard frameCount > 0 else { 
-            print("Invalid frame count: \(frameCount) for \(data.count) bytes")
+            print("❌ Invalid frame count: \(frameCount) for \(data.count) bytes")
             return 
         }
         
@@ -844,6 +1156,12 @@ class BestReceiver: NSObject, ObservableObject {
             
             // 即時再生 (遅延最優先) with Clock Recovery
             let finalBuffer = orpheusEnabled ? buffer : processAudioWithStability(buffer)
+            
+            // 🔊 **DEBUGGING**: Log actual buffer scheduling
+            if packetsReceived < 20 {
+                print("🔊 Scheduling buffer: \(finalBuffer.frameLength) frames, player running: \(playerNode.isPlaying)")
+            }
+            
             playerNode.scheduleBuffer(finalBuffer, completionHandler: nil) // コールバック除去で高速化
         } else {
             print("Failed to create PCM buffer for \(frameCount) frames")
@@ -979,6 +1297,16 @@ extension BestReceiver {
         
         DispatchQueue.main.async {
             print("🎛️ Jitter buffer size updated to: \(newSize)")
+        }
+    }
+    
+    // 🎛️ **レイテンシー調整機能**
+    func setTargetLatency(_ latencyMs: Double) {
+        targetLatencyMs = max(10.0, min(200.0, latencyMs))
+        jitterBuffer.setTargetLatency(targetLatencyMs)
+        
+        DispatchQueue.main.async {
+            print("🎯 Target latency set to: \(String(format: "%.1f", self.targetLatencyMs))ms")
         }
     }
     

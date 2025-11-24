@@ -129,7 +129,10 @@ enum AudioQuality {
     
     var bufferSize: UInt32 {
         switch self {
-        case .ultra, .high, .medium, .low: return 128
+        case .ultra: return 128   // 🔧 UDP MTU制限対応・超低遅延 (~1.3ms @ 96kHz)
+        case .high: return 128    // 🔧 UDP MTU制限対応・低遅延 (~2.7ms @ 48kHz) 
+        case .medium: return 128  // 🔧 UDP MTU制限対応・中遅延 (~2.7ms @ 48kHz)
+        case .low: return 64      // 🔧 最低レイテンシー (~1.5ms @ 44.1kHz)
         }
     }
     
@@ -552,7 +555,7 @@ class BestSender: NSObject, ObservableObject {
     // ネットワーク品質監視
     private var networkStats = NetworkStats()
     private var currentSampleRate: Double = 48000
-    private var currentBufferSize: UInt32 = 128
+    private var currentBufferSize: UInt32 = 128  // 🔧 UDP MTU制限のため128に変更
     
     // 自動ゲイン制御(AGC)
     private var agc = AutomaticGainControl()
@@ -583,7 +586,7 @@ class BestSender: NSObject, ObservableObject {
     // 🎛️ **リアルタイム設定切り替え**
     @Published var selectedSampleRate: Double = 96000 // サンプルレート
     @Published var selectedChannels: UInt32 = 2        // チャンネル数
-    @Published var selectedBufferSize: UInt32 = 128    // バッファサイズ
+    @Published var selectedBufferSize: UInt32 = 128    // 🔧 バッファサイズ（UDP MTU制限のため128に変更）
     @Published var noiseReductionEnabled: Bool = true  // ノイズリダクション
     @Published var agcEnabled: Bool = true             // AGC自動ゲイン制御
     @Published var compressionEnabled: Bool = true     // マルチバンド圧縮
@@ -619,6 +622,12 @@ class BestSender: NSObject, ObservableObject {
         super.init()
         print("🚀 BestSender初期化開始")
         startDiscovering()
+        
+        // 📱 **テザリング環境での物理iPhone自動追加**
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.addManualDevice(ip: "172.20.10.1", name: "Physical iPhone (Tethered)")
+        }
+        
         print("✅ BestSender初期化完了")
     }
     
@@ -741,8 +750,9 @@ class BestSender: NSObject, ObservableObject {
         // 🎬 録音処理 - 処理されたオーディオを録音
         writeToRecordingFile(buffer)
         
-        // 3. 品質監視とログ出力 (96kHz = 750 packets/sec なので調整)
-        if packetID % 750 == 0 { // 1秒ごと (96kHz/128 = 750 packets/sec)
+        // 3. 品質監視とログ出力 (動的パケット頻度)
+        let packetsPerSec = Int(currentSampleRate / Double(selectedBufferSize))
+        if packetID % UInt64(packetsPerSec) == 0 { // 1秒ごと
             let quality = networkStats.recommendedQuality()
             let gain = agc.currentGainDB
             let compressionInfo = agc.compressionInfo
@@ -751,7 +761,7 @@ class BestSender: NSObject, ObservableObject {
             // UIメーター更新
             DispatchQueue.main.async {
                 self.averageLatency = self.networkStats.averageLatency
-                self.packetsPerSecond = 750 // 96kHz ステレオでは750 packets/sec
+                self.packetsPerSecond = UInt64(packetsPerSec) // 動的に計算 (sampleRate/bufferSize)
             }
         }
         
@@ -797,7 +807,8 @@ class BestSender: NSObject, ObservableObject {
         for (hostKey, conn) in connections {
             // 接続が準備できているかチェック
             guard conn.state == .ready else {
-                if packetID % 750 == 0 { // 1秒ごとにログ
+                let packetsPerSec = Int(currentSampleRate / Double(selectedBufferSize))
+                if packetID % UInt64(packetsPerSec) == 0 { // 1秒ごとにログ
                     print("⚠️ Skipping \(hostKey) - connection not ready: \(conn.state)")
                 }
                 continue
@@ -806,19 +817,25 @@ class BestSender: NSObject, ObservableObject {
             // 🎯 **シンプルで確実な送信** - 重複送信を廃止し、エラーハンドリング強化
             conn.send(content: serialized, completion: .contentProcessed { error in
                 if let error = error {
-                    if self.packetID % 750 == 0 { // エラーログも1秒ごと
+                    let packetsPerSec = Int(self.currentSampleRate / Double(self.selectedBufferSize))
+                    if self.packetID % UInt64(packetsPerSec) == 0 { // エラーログも1秒ごと
                         print("📡 Send error to \(hostKey): \(error)")
                     }
                     // 📊 **送信エラー対応**: 再試行は行わず、ユーザーに状況を通知
                     DispatchQueue.main.async {
                         self.addNotification(.warning, "⚠️ Send error to \(hostKey)")
                     }
+                } else {
+                    // 🔍 **送信成功デバッグ**: 最初の数パケットの送信を確認
+                    if self.packetID <= 10 {
+                        print("✅ Packet \(self.packetID) sent successfully to \(hostKey) (\(serialized.count) bytes)")
+                    }
                 }
             })
         }
         
         // 📊 アクティブ接続数の監視
-        if packetID % 750 == 0 {
+        if packetID % UInt64(packetsPerSec) == 0 {
             let readyConnections = connections.filter { $0.value.state == .ready }.count
             let totalConnections = connections.count
             print("📡 Active connections: \(readyConnections)/\(totalConnections)")
@@ -866,7 +883,11 @@ class BestSender: NSObject, ObservableObject {
                 continue
             }
             
-            let host = NWEndpoint.Host(device.host)
+            // 🔧 **iOS Simulator Fix**: Resolve host for simulator compatibility
+            let resolvedHost = resolveSimulatorHost(device.host)
+            print("🔧 Bulk connect: Resolved \(device.host) -> \(resolvedHost)")
+            
+            let host = NWEndpoint.Host(resolvedHost)
             let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
             let conn = NWConnection(host: host, port: port, using: params)
             
@@ -1021,7 +1042,11 @@ class BestSender: NSObject, ObservableObject {
         params.serviceClass = .interactiveVoice
         params.defaultProtocolStack.transportProtocol = NWProtocolUDP.Options()
         
-        let host = NWEndpoint.Host(device.host)
+        // 🔧 **iOS Simulator Fix**: Resolve host for retry connections
+        let resolvedHost = resolveSimulatorHost(device.host)
+        print("🔧 Retry: Resolved \(device.host) -> \(resolvedHost)")
+        
+        let host = NWEndpoint.Host(resolvedHost)
         let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
         let conn = NWConnection(host: host, port: port, using: params)
         
@@ -1060,6 +1085,33 @@ class BestSender: NSObject, ObservableObject {
         
         conn.start(queue: DispatchQueue.global(qos: .userInteractive))
         connections[device.host] = conn
+    }
+    
+    // 📱 **手動デバイス追加** - 物理iPhoneのテザリング用
+    func addManualDevice(ip: String, name: String = "Physical iPhone") {
+        let device = DiscoveredDevice(name: name, host: ip, port: 55555)
+        
+        // 重複チェック
+        if discoveredDevices.contains(where: { $0.host == ip }) {
+            print("📱 Device \(ip) already exists")
+            DispatchQueue.main.async {
+                self.addNotification(.warning, "⚠️ Device already exists: \(ip)")
+            }
+            return
+        }
+        
+        // デバイスを追加
+        discoveredDevices.append(device)
+        print("📱 Manually added device: \(name) at \(ip)")
+        
+        DispatchQueue.main.async {
+            self.addNotification(.success, "📱 Added device: \(name)")
+        }
+        
+        // 自動接続が有効で、ストリーミング中なら接続試行
+        if autoConnectEnabled && isStreaming {
+            connectToDevice(device)
+        }
     }
     
     // 🧪 **接続テスト** - 小さなパケットで接続確認
@@ -1167,6 +1219,37 @@ extension BestSender: NetServiceDelegate {
         print("Failed to resolve service \(sender.name): \(errorDict)")
     }
     
+    // 🔧 **iOS Simulator Network Resolution Helper**
+    private func resolveSimulatorHost(_ originalHost: String) -> String {
+        // Handle common iOS Simulator bridge network scenarios
+        
+        // 🌐 **IPv6 localhost for iOS Simulator compatibility**
+        if originalHost == "127.0.0.1" || originalHost == "localhost" {
+            return "::1"  // IPv6 localhost to match receiver
+        }
+        
+        // 📱 **物理iPhoneのテザリング接続**: 172.20.10.1は実際のiPhone
+        if originalHost == "172.20.10.1" {
+            print("📱 Physical iPhone detected (\(originalHost)) -> direct connection")
+            return originalHost  // 物理デバイスには直接接続
+        }
+        
+        // iOS Simulator bridge network: 他の172.20.10.x -> IPv6 localhost
+        if originalHost.hasPrefix("172.20.10.") {
+            print("🔧 iOS Simulator bridge network detected (\(originalHost)) -> routing to IPv6 localhost")
+            return "::1"
+        }
+        
+        // Host Machine bridge: 192.168.x.x may need IPv6 localhost routing  
+        if originalHost.hasPrefix("192.168.") {
+            print("🔧 Local network IP detected (\(originalHost)) -> trying IPv6 localhost for simulator")
+            return "::1"
+        }
+        
+        // Default: use original host for real devices
+        return originalHost
+    }
+    
     func connectToDevice(_ device: DiscoveredDevice) {
         // 🚨 **重複接続防止**: 既に接続がある場合はスキップ
         if connections[device.host] != nil {
@@ -1176,11 +1259,15 @@ extension BestSender: NetServiceDelegate {
         
         print("🔗 Connecting to device: \(device.name) at \(device.host):\(device.port)")
         
+        // 🔧 **iOS Simulator Fix**: Handle localhost and simulator bridge IPs
+        let resolvedHost = resolveSimulatorHost(device.host)
+        print("🔧 Resolved \(device.host) -> \(resolvedHost) for iOS Simulator compatibility")
+        
         let params = NWParameters.udp
         params.serviceClass = .interactiveVoice
         params.defaultProtocolStack.transportProtocol = NWProtocolUDP.Options()
         
-        let host = NWEndpoint.Host(device.host)
+        let host = NWEndpoint.Host(resolvedHost)
         let port = NWEndpoint.Port(integerLiteral: UInt16(device.port))
         let conn = NWConnection(host: host, port: port, using: params)
         
