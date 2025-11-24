@@ -10,10 +10,10 @@
 
 **業界最高水準 96kHz/12ms 超低遅延オーディオストリーミングシステム**
 
-[🌐 **公式サイト**](https://yourusername.github.io/hiaudio) • 
-[📱 **Web版を試す**](https://yourusername.github.io/hiaudio/web-receiver.html) • 
+[🌐 **公式サイト**](https://yukihamada.github.io/wasmix) • 
+[📱 **Web版を試す**](https://yukihamada.github.io/wasmix/web-receiver.html) • 
 [📖 **ドキュメント**](./COMPREHENSIVE_TEST_REPORT.md) • 
-[🚀 **リリース**](https://github.com/yourusername/hiaudio/releases)
+[🚀 **リリース**](https://github.com/yukihamada/wasmix/releases)
 
 </div>
 
