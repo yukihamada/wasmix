@@ -8,7 +8,7 @@
 ![Latency](https://img.shields.io/badge/Latency-2.25ms-red?style=for-the-badge)
 ![Quality](https://img.shields.io/badge/Audio-96kHz%2F24bit-gold?style=for-the-badge)
 
-**業界最高水準 96kHz/12ms 超低遅延オーディオストリーミングシステム**
+**業界最高水準 96kHz/12ms 超低遅延オーディオストリーミングシステム** 🚀
 
 [🌐 **公式サイト**](https://yukihamada.github.io/wasmix) • 
 [📱 **Web版を試す**](https://yukihamada.github.io/wasmix/web-receiver.html) • 
