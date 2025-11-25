@@ -393,6 +393,8 @@ furnished to do so, subject to the following conditions:
 
 **🔥 HiAudio Pro - 業界最高水準のオーディオストリーミング 🔥**
 
+*新しい GitHub URL: https://github.com/yukihamada/hiaudio*
+
 [🌐 公式サイト](https://yukihamada.github.io/hiaudio) • [📱 Web版](https://yukihamada.github.io/hiaudio/web-receiver.html) • [🐛 Issue報告](https://github.com/yukihamada/hiaudio/issues) • [💬 Discussions](https://github.com/yukihamada/hiaudio/discussions)
 
 **⭐ このプロジェクトが気に入ったら、ぜひスターをつけてください！**
