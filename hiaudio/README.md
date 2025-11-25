@@ -10,10 +10,10 @@
 
 **業界最高水準 96kHz/12ms 超低遅延オーディオストリーミングシステム** 🚀
 
-[🌐 **公式サイト**](https://yukihamada.github.io/wasmix) • 
-[📱 **Web版を試す**](https://yukihamada.github.io/wasmix/web-receiver.html) • 
+[🌐 **公式サイト**](https://yukihamada.github.io/hiaudio) • 
+[📱 **Web版を試す**](https://yukihamada.github.io/hiaudio/web-receiver.html) • 
 [📖 **ドキュメント**](./COMPREHENSIVE_TEST_REPORT.md) • 
-[🚀 **リリース**](https://github.com/yukihamada/wasmix/releases)
+[🚀 **リリース**](https://github.com/yukihamada/hiaudio/releases)
 
 </div>
 
@@ -75,13 +75,13 @@ HiAudio Proは業界をリードする**96kHz/24bit音質**と**2.25ms超低遅�
 ### 🌐 Web版（最速）
 ```bash
 # アプリインストール不要！ブラウザで即座に体験
-open https://yukihamada.github.io/wasmix/web-receiver.html
+open https://yukihamada.github.io/hiaudio/web-receiver.html
 ```
 
 ### 💻 macOS Sender セットアップ
 ```bash
 # 1. リリースからダウンロード
-curl -L https://github.com/yukihamada/wasmix/releases/latest/download/HiAudioSender-macOS.zip -o HiAudioSender.zip
+curl -L https://github.com/yukihamada/hiaudio/releases/latest/download/HiAudioSender-macOS.zip -o HiAudioSender.zip
 
 # 2. 解凍してインストール
 unzip HiAudioSender.zip
@@ -94,13 +94,13 @@ open "/Applications/HiAudio Sender.app"
 ### 📱 iOS Receiver セットアップ
 ```bash
 # 1. iOSデバイスからダウンロード
-# https://github.com/yukihamada/wasmix/releases/latest/download/HiAudioReceiver-iOS.ipa
+# https://github.com/yukihamada/hiaudio/releases/latest/download/HiAudioReceiver-iOS.ipa
 
 # 2. AltStoreまたはSideloadlyでインストール
 # 3. 設定 > 一般 > VPN設定で信頼
 
 # または Web版を使用（推奨）
-# Safari で https://yukihamada.github.io/wasmix/web-receiver.html
+# Safari で https://yukihamada.github.io/hiaudio/web-receiver.html
 ```
 
 ---
@@ -227,8 +227,8 @@ swift TestRunner.swift
 ### 🏗️ ビルド方法
 ```bash
 # 開発環境セットアップ
-git clone https://github.com/yukihamada/wasmix.git
-cd wasmix
+git clone https://github.com/yukihamada/hiaudio.git
+cd hiaudio
 
 # macOS Sender ビルド
 xcodebuild -project HiAudioSender.xcodeproj -scheme HiAudioSender -configuration Release
@@ -312,7 +312,7 @@ if ('serviceWorker' in navigator) {
 ### 🐛 バグレポート
 ```bash
 # GitHub Issues使用
-https://github.com/yukihamada/wasmix/issues
+https://github.com/yukihamada/hiaudio/issues
 
 # テンプレート情報
 - OS/デバイス情報
@@ -393,7 +393,7 @@ furnished to do so, subject to the following conditions:
 
 **🔥 HiAudio Pro - 業界最高水準のオーディオストリーミング 🔥**
 
-[🌐 公式サイト](https://yukihamada.github.io/wasmix) • [📱 Web版](https://yukihamada.github.io/wasmix/web-receiver.html) • [🐛 Issue報告](https://github.com/yukihamada/wasmix/issues) • [💬 Discussions](https://github.com/yukihamada/wasmix/discussions)
+[🌐 公式サイト](https://yukihamada.github.io/hiaudio) • [📱 Web版](https://yukihamada.github.io/hiaudio/web-receiver.html) • [🐛 Issue報告](https://github.com/yukihamada/hiaudio/issues) • [💬 Discussions](https://github.com/yukihamada/hiaudio/discussions)
 
 **⭐ このプロジェクトが気に入ったら、ぜひスターをつけてください！**
 

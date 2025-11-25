@@ -83,7 +83,7 @@ cat > release-notes.md << 'EOF'
 ### 💾 ダウンロード
 - **macOS Sender**: `HiAudioSender-macOS.zip`
 - **iOS Receiver**: `HiAudioReceiver-iOS.zip` 
-- **Web Receiver**: https://yukihamada.github.io/wasmix/web-receiver.html
+- **Web Receiver**: https://yukihamada.github.io/hiaudio/web-receiver.html
 
 ### 🔧 システム要件
 - **macOS**: 12.0以降、Apple Silicon推奨
